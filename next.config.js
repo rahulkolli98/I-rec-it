@@ -6,6 +6,9 @@ const nextConfig = {
     MONGODB_URI: process.env.MONGODB_URI,
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
   },
+  compiler: {
+    styledComponents: true,
+  },
 }
 
 module.exports = nextConfig
