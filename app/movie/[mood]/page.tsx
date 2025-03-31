@@ -167,7 +167,7 @@ export default function MoviePage() {
             </h1>
             <div className="h-px w-24 bg-zinc-800 mb-6"></div>
             <p className="code-text text-zinc-400 text-lg mb-12">
-              We've found the perfect film that matches your current state of mind.
+              We&apos;ve found the perfect film that matches your current state of mind.
             </p>
           </div>
           
@@ -268,7 +268,26 @@ export default function MoviePage() {
               <div className="flex items-center gap-2 mb-4">
                 <h3 className="modern-heading text-2xl gradient-text">Cinematic Essence</h3>
               </div>
-              <p className="code-text text-base mb-8 leading-relaxed text-zinc-300">{summary}</p>
+              <div className="text-zinc-300 mt-4">
+                <p className="mb-4 leading-relaxed">
+                  {summary}
+                </p>
+                {movie.ai_reasons && movie.ai_reasons.length > 0 && (
+                  <div className="bg-black/20 p-4 rounded-lg border border-zinc-800 my-4">
+                    <h4 className="text-orange-400 mb-2 text-sm font-medium">Why this film perfectly matches your {moodString} mood:</h4>
+                    <ul className="list-disc pl-5 space-y-1 text-sm text-zinc-400">
+                      {movie.ai_reasons.map((reason, index) => (
+                        <li key={index}>{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="text-zinc-400 text-sm">
+                  Experience the perfect harmony between this cinematic masterpiece and your chosen mood. Stream or watch this film to align 
+                  with your selected mood. The director&apos;s artistic vision creates an immersive world that 
+                  resonates with how you&apos;re feeling right now.
+                </p>
+              </div>
               
               <div className="gradient-border p-6 rounded-lg">
                 <div className="flex items-center mb-4">

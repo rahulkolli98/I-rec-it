@@ -2,76 +2,66 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
-
+  
   if (!apiKey) {
     return NextResponse.json({ error: 'Missing OPENROUTER_API_KEY environment variable' }, { status: 500 });
   }
 
   try {
-    const { overview, mood, title, genres, mood_keywords = [], ai_reasons = [] } = await request.json();
-
-    if (!overview) {
-      return NextResponse.json({ error: 'Missing overview parameter' }, { status: 400 });
-    }
-
+    const { overview, mood, title, genres, mood_keywords, ai_reasons } = await request.json();
+    
     // Enhanced mood descriptions for better summaries
     const moodDescriptions: Record<string, string> = {
-      happy: "joyful, uplifting, and light-hearted",
-      sad: "melancholic, moving, and emotionally resonant",
-      excited: "thrilling, high-energy, and adrenaline-pumping",
-      relaxed: "peaceful, calming, and contemplative",
-      romantic: "heartfelt, passionate, and emotionally intimate",
-      scared: "frightening, tense, and unsettling",
-      thoughtful: "philosophical, thought-provoking, and intellectually stimulating",
-      mysterious: "enigmatic, puzzling, and full of intrigue",
-      adventurous: "journey-filled, explorative, and exciting",
-      nostalgic: "reminiscent, memory-evoking, and timelessly familiar",
-      inspired: "motivational, encouraging, and emotionally uplifting",
-      tense: "suspenseful, edge-of-seat, and nerve-wracking",
-      funny: "humorous, laugh-inducing, and comedic",
-      epic: "grand, sweeping, and monumentally impressive",
-      heartwarming: "touching, emotionally resonant, and feel-good"
+      happy: "uplifting, joyful, and positive emotions",
+      sad: "melancholy, emotional depth, and poignant reflection",
+      excited: "thrilling, high-energy, and adrenaline-pumping moments",
+      relaxed: "calm, peaceful, and soothing sensations",
+      romantic: "love, passion, and emotional connection",
+      scared: "fear, tension, and spine-chilling thrills",
+      thoughtful: "intellectual stimulation, philosophy, and deep introspection",
+      mysterious: "intrigue, suspense, and enigmatic elements",
+      adventurous: "exploration, journey, and exciting discoveries",
+      nostalgic: "reminiscence, memory, and emotional longing for the past",
+      inspired: "motivation, encouragement, and personal transformation",
+      tense: "suspense, anxiety, and edge-of-seat anticipation",
+      funny: "humor, laughter, and comedic situations",
+      epic: "grandeur, spectacle, and monumental storytelling",
+      heartwarming: "emotional comfort, tenderness, and uplifting stories"
     };
-
-    // Get appropriate adjectives for this mood
-    const moodAdjectives = moodDescriptions[mood.toLowerCase()] || 
-      `that perfectly captures the ${mood} feeling`;
     
-    // Format genre names for better readability
-    const genreNames = genres?.map((g: any) => g.name).join(', ') || 'various genres';
+    // Format genre names for readability
+    const formattedGenres = genres.map((genre: { name: string }) => genre.name).join(', ');
     
     // Format AI reasons if available
-    let aiReasonsText = "";
-    if (ai_reasons && ai_reasons.length > 0) {
-      aiReasonsText = "Expert notes on why this film matches the mood:\n" + 
-        ai_reasons.map((reason: string) => `- ${reason}`).join('\n') + "\n\n";
-    }
+    const aiReasonsText = ai_reasons && ai_reasons.length > 0
+      ? "AI-provided reasons why this film matches the mood: " +
+        ai_reasons.map((reason: string) => `"${reason}"`).join(", ")
+      : "";
     
-    // Craft a more targeted prompt that focuses on the emotional connection
-    const keywordsString = mood_keywords.length > 0 ? 
-      `Consider using these mood-related keywords: ${mood_keywords.join(', ')}.` : '';
+    const moodDescription = moodDescriptions[mood.toLowerCase()] || mood;
     
     const prompt = `
-      Write an engaging, thoughtful summary for the movie "${title}" that strongly emphasizes 
-      its connection to a ${mood.toLowerCase()} mood. This film falls within ${genreNames} and 
-      has the following official description:
-      
-      "${overview}"
-      
-      ${aiReasonsText}
-      
-      Your summary should:
-      1. Highlight specifically how this film creates a ${moodAdjectives} experience for viewers
-      2. Mention particular elements (characters, plot, visuals, music) that contribute to this mood
-      3. Explain why someone feeling "${mood}" would connect with this specific film
-      
-      ${keywordsString}
-      
-      Keep your response concise (3-4 sentences) yet compelling, focusing primarily on the 
-      emotional impact of the film and why it's perfect for someone in a ${mood.toLowerCase()} mood.
+    Generate a compelling, engaging summary for the film "${title}" that highlights how it connects to a ${mood} mood.
+    
+    Film overview: "${overview}"
+    
+    Film genres: ${formattedGenres}
+    
+    A ${mood} mood is characterized by ${moodDescription}.
+    
+    Keywords associated with this mood: ${mood_keywords ? mood_keywords.join(', ') : ''}
+    
+    ${aiReasonsText}
+    
+    Your summary should:
+    1. Highlight how the film creates a ${mood} experience for viewers
+    2. Mention specific elements in the film that contribute to this mood
+    3. Explain why someone feeling ${mood} would connect with this film
+    4. Be around 3-4 sentences long, with vivid and emotionally resonant language
+    5. Avoid plot spoilers or twists
     `;
-
+    
+    const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
     const response = await fetch(openRouterUrl, {
       method: 'POST',
       headers: {
@@ -88,18 +78,18 @@ export async function POST(request: Request) {
         ],
       }),
     });
-
+    
     const data = await response.json();
-
+    
     if (data.error) {
-      console.error('OpenRouter API Error:', data.error);
+      console.error('Error from OpenRouter API:', data.error);
       return NextResponse.json({ error: 'Failed to summarize movie', details: data.error }, { status: 500 });
     }
-
-    const summary = data.choices[0].message.content;
+    
+    const summary = data.choices[0].message.content.trim();
     return NextResponse.json({ summary });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in movie summarization:', error);
     return NextResponse.json({ error: 'Failed to summarize movie' }, { status: 500 });
   }
 } 

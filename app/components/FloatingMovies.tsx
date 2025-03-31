@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
+import Image from 'next/image';
 
 // Curated selection of high-quality movie posters
 const moviePosters = [
@@ -40,8 +41,8 @@ const FloatingMovies: React.FC<FloatingMoviesProps> = ({ count = 10 }) => {
 
   return (
     <MovieContainer>
-      {movies.map((src, index) => (
-        <FloatingMovie key={`movie-${index}`} src={src} index={index} />
+      {movies.map((src, i) => (
+        <FloatingMovie key={`movie-${i}`} src={src} />
       ))}
     </MovieContainer>
   );
@@ -49,10 +50,14 @@ const FloatingMovies: React.FC<FloatingMoviesProps> = ({ count = 10 }) => {
 
 interface FloatingMovieProps {
   src: string;
-  index: number;
 }
 
-const FloatingMovie: React.FC<FloatingMovieProps> = ({ src, index }) => {
+interface Position {
+  x: number;
+  y: number;
+}
+
+const FloatingMovie: React.FC<FloatingMovieProps> = ({ src }) => {
   // Determine starting and ending edges for the movie
   const getRandomEdges = () => {
     const edges = ['top', 'right', 'bottom', 'left'];
@@ -82,8 +87,8 @@ const FloatingMovie: React.FC<FloatingMovieProps> = ({ src, index }) => {
   // Generate start and end positions
   const generatePositions = () => {
     const { startEdge, endEdge } = getRandomEdges();
-    const startPos = { x: 0, y: 0 };
-    const endPos = { x: 0, y: 0 };
+    const startPos: Position = { x: 0, y: 0 };
+    const endPos: Position = { x: 0, y: 0 };
     
     // Set start position
     if (startEdge === 'top') {
@@ -119,7 +124,7 @@ const FloatingMovie: React.FC<FloatingMovieProps> = ({ src, index }) => {
   };
 
   // Generate control points for curved path
-  const generateControlPoints = (startPos: any, endPos: any) => {
+  const generateControlPoints = (startPos: Position, endPos: Position) => {
     const controlPoint1 = {
       x: Math.random() * 100,
       y: Math.random() * 100
@@ -184,12 +189,15 @@ const FloatingMovie: React.FC<FloatingMovieProps> = ({ src, index }) => {
         repeatType: "loop",
       }}
     >
-      <img 
-        src={src} 
-        alt="Movie poster" 
-        className="w-full h-auto rounded-lg shadow-lg hover:scale-105 transition-transform"
-        style={{ aspectRatio: '2/3' }}
-      />
+      <div className="relative w-full" style={{ aspectRatio: '2/3' }}>
+        <Image 
+          src={src} 
+          alt="Movie poster" 
+          fill
+          sizes="(max-width: 768px) 100px, 180px"
+          className="rounded-lg shadow-lg object-cover hover:scale-105 transition-transform"
+        />
+      </div>
     </motion.div>
   );
 };

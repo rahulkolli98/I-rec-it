@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
-interface MovieResult {
+// This interface is used in the code, so renaming to make it clear
+interface TMDBMovieResult {
   id: number;
   title: string;
   overview: string;
@@ -16,6 +17,22 @@ interface MovieSuggestion {
   year?: string | number;
   director?: string;
   reasons?: string[];
+}
+
+// Types for videos and crew members
+interface VideoResult {
+  type: string;
+  site: string;
+  key: string;
+}
+
+interface CrewMember {
+  job: string;
+  name: string;
+}
+
+interface CastMember {
+  name: string;
 }
 
 export async function GET(request: Request) {
@@ -226,7 +243,7 @@ export async function GET(request: Request) {
     let trailerKey = null;
     if (movieDetails.videos && movieDetails.videos.results) {
       const trailer = movieDetails.videos.results.find(
-        (video: any) => video.type === 'Trailer' && video.site === 'YouTube'
+        (video: VideoResult) => video.type === 'Trailer' && video.site === 'YouTube'
       );
       if (trailer) {
         trailerKey = trailer.key;
@@ -269,8 +286,10 @@ export async function GET(request: Request) {
       backdrop_path: movieDetails.backdrop_path,
       genres: movieDetails.genres || [],
       trailer_key: trailerKey,
-      director: selectedSuggestion.director || movieDetails.credits?.crew?.find((person: any) => person.job === 'Director')?.name || 'Unknown',
-      cast: movieDetails.credits?.cast?.slice(0, 5).map((person: any) => person.name) || [],
+      director: selectedSuggestion.director || 
+                movieDetails.credits?.crew?.find((person: CrewMember) => person.job === 'Director')?.name || 
+                'Unknown',
+      cast: movieDetails.credits?.cast?.slice(0, 5).map((person: CastMember) => person.name) || [],
       mood_keywords: moodKeywords,
       ai_reasons: selectedSuggestion.reasons || []
     };
@@ -384,7 +403,7 @@ async function fallbackToGenreMapping(apiKey: string, mood: string, seedNum: num
     let trailerKey = null;
     if (movieDetails.videos && movieDetails.videos.results) {
       const trailer = movieDetails.videos.results.find(
-        (video: any) => video.type === 'Trailer' && video.site === 'YouTube'
+        (video: VideoResult) => video.type === 'Trailer' && video.site === 'YouTube'
       );
       if (trailer) {
         trailerKey = trailer.key;
@@ -421,8 +440,8 @@ async function fallbackToGenreMapping(apiKey: string, mood: string, seedNum: num
       backdrop_path: movieDetails.backdrop_path,
       genres: movieDetails.genres || [],
       trailer_key: trailerKey,
-      director: movieDetails.credits?.crew?.find((person: any) => person.job === 'Director')?.name || 'Unknown',
-      cast: movieDetails.credits?.cast?.slice(0, 5).map((person: any) => person.name) || [],
+      director: movieDetails.credits?.crew?.find((person: CrewMember) => person.job === 'Director')?.name || 'Unknown',
+      cast: movieDetails.credits?.cast?.slice(0, 5).map((person: CastMember) => person.name) || [],
       mood_keywords: moodKeywords[mood.toLowerCase()] || []
     };
     

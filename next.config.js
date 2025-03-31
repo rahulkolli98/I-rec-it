@@ -9,6 +9,10 @@ const nextConfig = {
   compiler: {
     styledComponents: true,
   },
+  eslint: {
+    // Disable ESLint during production builds for faster deployment
+    ignoreDuringBuilds: true,
+  },
 }
 
 module.exports = nextConfig

@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Tilt } from '@/components/ui/tilt';
-import Loader from '@/app/components/Loader';
 import DynamicBackground from '@/app/components/DynamicBackground';
 import NoiseOverlay from '@/app/components/NoiseOverlay';
 import LoadingPage from '@/app/components/LoadingPage';
@@ -167,7 +166,7 @@ export default function MoodPage() {
             </h1>
             <div className="h-px w-24 bg-zinc-800 mb-6"></div>
             <p className="code-text text-zinc-400 text-lg mb-12">
-              We've crafted the perfect literary companion for your current state of mind.
+              We&apos;ve crafted the perfect literary companion for your current state of mind.
             </p>
           </div>
           
@@ -227,10 +226,10 @@ export default function MoodPage() {
               <p className="code-text text-base mb-8 leading-relaxed text-zinc-300">{summary}</p>
               
               <div className="gradient-border p-6 rounded-lg">
-                <p className="code-text text-base text-zinc-300 mb-4">
+                <p className="text-zinc-300 text-sm">
                   This book captures the quintessential elements of a {moodString.toLowerCase()} experience, 
                   weaving together narrative threads that mirror your chosen emotional landscape. 
-                  The author's craftsmanship creates a world that speaks directly to your current mindset.
+                  The author&apos;s craftsmanship creates a world that speaks directly to your current mindset.
                 </p>
                 <div className="flex items-center gap-2 mt-4 pt-4 border-t border-zinc-800">
                   <span className="code-text text-sm text-zinc-400">Resonates with</span>

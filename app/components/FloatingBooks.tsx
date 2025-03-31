@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
+import Image from 'next/image';
 
 // Curated selection of high-quality book covers
 const bookCovers = [
@@ -39,8 +40,8 @@ const FloatingBooks: React.FC<FloatingBooksProps> = ({ count = 10 }) => {
 
   return (
     <BookContainer>
-      {books.map((src, index) => (
-        <FloatingBook key={`book-${index}`} src={src} index={index} />
+      {books.map((src, i) => (
+        <FloatingBook key={`book-${i}`} src={src} />
       ))}
     </BookContainer>
   );
@@ -48,10 +49,9 @@ const FloatingBooks: React.FC<FloatingBooksProps> = ({ count = 10 }) => {
 
 interface BookProps {
   src: string;
-  index: number;
 }
 
-const FloatingBook: React.FC<BookProps> = ({ src, index }) => {
+const FloatingBook: React.FC<BookProps> = ({ src }) => {
   const randomSize = 140 + Math.random() * 60; // 140px-200px
   const randomDuration = 70 + Math.random() * 50; // 70-120s
   const randomRotation = Math.random() * 20 - 10; // -10 to 10 degrees
@@ -135,12 +135,15 @@ const FloatingBook: React.FC<BookProps> = ({ src, index }) => {
         style={{ 
           width: `${randomSize}px`,
           height: `${randomSize * 1.5}px`,
+          position: 'relative'
         }}
       >
-        <img 
+        <Image 
           src={src} 
           alt="Floating book cover" 
-          className="w-full h-full object-cover" 
+          fill
+          sizes={`${randomSize}px`}
+          className="object-cover" 
         />
       </div>
     </motion.div>

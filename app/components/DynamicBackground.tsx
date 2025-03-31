@@ -22,7 +22,7 @@ const DynamicBackground: React.FC = () => {
     window.addEventListener('resize', handleResize);
 
     // Create gradient objects
-    let gradientOrbs: GradientOrb[] = [];
+    const gradientOrbs: GradientOrb[] = [];
     const orbCount = 3;
     
     for (let i = 0; i < orbCount; i++) {
