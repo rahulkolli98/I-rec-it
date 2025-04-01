@@ -27,10 +27,15 @@ export default function MoodPage() {
   const [summary, setSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [regenerationCounter, setRegenerationCounter] = useState(0);
+  const [previousRecommendations, setPreviousRecommendations] = useState<string[]>([]);
   
   // Function to trigger regeneration
   const regenerateRecommendation = () => {
     setLoading(true);
+    // If we have a current book title, add it to previous recommendations
+    if (book?.title) {
+      setPreviousRecommendations(prev => [...prev, book.title]);
+    }
     setRegenerationCounter(prev => prev + 1);
   };
 
@@ -44,40 +49,89 @@ export default function MoodPage() {
     async function fetchBook() {
       setLoading(true);
       try {
-        // Fetch book title from DeepSeek API based on the selected mood
-        const deepSeekApiKey = process.env.OPENROUTER_API_KEY;
+        // Fetch book title from OpenRouter API based on the selected mood
+        const openRouterApiKey = process.env.OPENROUTER_API_KEY;
         const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
-        const deepSeekResponse = await fetch(openRouterUrl, {
+        
+        // Use model from environment variables or fallback to a default
+        const recommendationModel = process.env.BOOK_RECOMMENDATION_MODEL || 'google/gemma-3-27b-it';
+        
+        if (!openRouterApiKey) {
+          throw new Error('Missing OPENROUTER_API_KEY in environment variables');
+        }
+        
+        const openRouterResponse = await fetch(openRouterUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${deepSeekApiKey}`,
+            'Authorization': `Bearer ${openRouterApiKey}`,
           },
           body: JSON.stringify({
-            model: 'deepseek/deepseek-chat:free',
+            model: recommendationModel,
             messages: [
               {
                 role: 'user',
-                // Add regeneration counter to ensure different results
-                content: `Suggest one book title that reflects the mood: ${mood}. Recommendation #${regenerationCounter + 1}`,
+                content: `As a literary expert, recommend a unique book title that perfectly captures the mood: ${mood}. 
+This is recommendation attempt #${regenerationCounter + 1}, so I need something different than previous suggestions.
+
+${previousRecommendations.length > 0 ? `Please DO NOT recommend any of these books that were already suggested: ${previousRecommendations.join(', ')}` : ''}
+
+The book should be well-known enough to be found in public book databases.
+Return ONLY the exact book title without any additional text, quotes, or commentary.`,
               },
             ],
+            temperature: 0.9,
+            top_p: 0.9,
+            frequency_penalty: 0.8,
+            presence_penalty: 0.8,
           }),
         });
-        const deepSeekData = await deepSeekResponse.json();
-        const bookTitle = deepSeekData.choices[0].message.content.trim();
+        
+        if (!openRouterResponse.ok) {
+          throw new Error(`OpenRouter API responded with status: ${openRouterResponse.status}`);
+        }
+        
+        const openRouterData = await openRouterResponse.json();
+        
+        if (!openRouterData || !openRouterData.choices || !openRouterData.choices[0] || !openRouterData.choices[0].message) {
+          console.error('Unexpected OpenRouter API response structure:', openRouterData);
+          throw new Error('Invalid response from OpenRouter API');
+        }
+        
+        const bookTitle = openRouterData.choices[0].message.content.trim();
+        console.log('Recommended book title:', bookTitle);
+
+        // Ensure we're not recommending the same book again
+        if (previousRecommendations.includes(bookTitle)) {
+          console.log('Already recommended this book before, trying again...');
+          setRegenerationCounter(prev => prev + 1);
+          return; // Exit this function call and retry via useEffect
+        }
 
         // Fetch book details from Google Books API based on the book title
         const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
-        const url = `https://www.googleapis.com/books/v1/volumes?q=${bookTitle}&key=${apiKey}`;
+        if (!apiKey) {
+          throw new Error('Missing GOOGLE_BOOKS_API_KEY in environment variables');
+        }
+        
+        // Add maxResults parameter and sort by relevance or newest
+        const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(bookTitle)}&maxResults=10&orderBy=${Math.random() > 0.5 ? 'relevance' : 'newest'}&key=${apiKey}`;
         const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Google Books API responded with status: ${response.status}`);
+        }
+        
         const data = await response.json();
 
         if (data.items && data.items.length > 0) {
-          const bookData = data.items[0].volumeInfo;
+          // Select a random book from the top 3 results (or fewer if less than 3 available)
+          const randomIndex = Math.floor(Math.random() * Math.min(3, data.items.length));
+          const bookData = data.items[randomIndex].volumeInfo;
+          console.log(`Selected book ${randomIndex + 1} of ${data.items.length}: ${bookData.title}`);
           setBook(bookData);
 
-          // Fetch summary from DeepSeek API
+          // Fetch summary from API
           const description = bookData.description || 'No description available.';
           const summaryResponse = await fetch('/api/summarize', {
             method: 'POST',
@@ -86,14 +140,20 @@ export default function MoodPage() {
             },
             body: JSON.stringify({ description }),
           });
+          
+          if (!summaryResponse.ok) {
+            throw new Error(`Summary API responded with status: ${summaryResponse.status}`);
+          }
+          
           const summaryData = await summaryResponse.json();
           setSummary(summaryData.summary || 'Failed to generate summary.');
         } else {
+          console.error('No books found for title:', bookTitle);
           setBook(null);
           setSummary('No books found for this mood.');
         }
       } catch (error) {
-        console.error(error);
+        console.error('Error fetching book:', error);
         setBook(null);
         setSummary('Failed to fetch book or summary.');
       } finally {
@@ -102,7 +162,7 @@ export default function MoodPage() {
     }
 
     fetchBook();
-  }, [mood, mediaType, regenerationCounter]);
+  }, [mood, mediaType, regenerationCounter, previousRecommendations]);
 
   if (loading) {
     return <LoadingPage customTitle="Finding Your Perfect Book" />;
