@@ -8,6 +8,7 @@ import DynamicBackground from '@/app/components/DynamicBackground';
 import NoiseOverlay from '@/app/components/NoiseOverlay';
 import LoadingPage from '@/app/components/LoadingPage';
 import Head from 'next/head';
+import Image from 'next/image';
 import { useMedia } from '@/app/context/MediaContext';
 
 interface Movie {
@@ -50,8 +51,11 @@ export default function MoviePage() {
     async function fetchMovie() {
       setLoading(true);
       try {
+        // Moodstring from params - can be in any case
+        const moodParam = mood?.toString() || '';
+        
         // Fetch a movie recommendation from our API based on the mood
-        const response = await fetch(`/api/movies/recommend?mood=${mood}&seed=${randomSeed}`);
+        const response = await fetch(`/api/movies/recommend?mood=${moodParam}&seed=${randomSeed}`);
         const data = await response.json();
         
         if (data.error || !data.movie) {
@@ -69,7 +73,7 @@ export default function MoviePage() {
           body: JSON.stringify({
             title: data.movie.title,
             overview: data.movie.overview,
-            mood: mood,
+            mood: moodParam,
             genres: data.movie.genres,
             mood_keywords: data.movie.mood_keywords || [],
             ai_reasons: data.movie.ai_reasons || []
@@ -94,8 +98,12 @@ export default function MoviePage() {
     return <LoadingPage customTitle="Finding Your Perfect Movie" />;
   }
 
+  // Format mood string for display
   const moodString = mood?.toString() || '';
-  const capitalizedMood = moodString.charAt(0).toUpperCase() + moodString.slice(1).toLowerCase();
+  
+  // Display different mood formats
+  const displayMood = moodString.toUpperCase(); // Match the UI buttons that are uppercase
+  const moodForPath = moodString.toLowerCase(); // Used in URL path display
 
   return (
     <>
@@ -160,10 +168,10 @@ export default function MoviePage() {
           <div>
             <div className="flex items-center gap-2 mb-2 text-zinc-400">
               <span className="code-text text-sm">~/moods/</span>
-              <span className="code-text text-zinc-300">{moodString.toLowerCase()}</span>
+              <span className="code-text text-zinc-300">{moodForPath}</span>
             </div>
             <h1 className="modern-heading text-5xl mb-2 gradient-text font-medium">
-              {capitalizedMood}
+              {displayMood}
             </h1>
             <div className="h-px w-24 bg-zinc-800 mb-6"></div>
             <p className="code-text text-zinc-400 text-lg mb-12">
@@ -202,11 +210,21 @@ export default function MoviePage() {
                 }}
               >
                 <div className="gradient-border flex flex-col overflow-hidden rounded-lg shadow-xl">
-                  <img
-                    src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
-                    alt={movie.title}
-                    className="w-full h-[400px] object-cover bg-zinc-900/90"
-                  />
+                  {movie.poster_path ? (
+                    <div className="relative w-full h-[400px] bg-zinc-900/90">
+                      <Image
+                        src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+                        alt={movie.title}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 280px"
+                        className="object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-[400px] flex items-center justify-center bg-zinc-900/90">
+                      <span className="text-zinc-600">No poster available</span>
+                    </div>
+                  )}
                   <div className="p-4">
                     <h2 className="modern-heading text-xl font-medium gradient-text mb-2">{movie.title}</h2>
                     <div className="flex items-center justify-between">
@@ -272,16 +290,6 @@ export default function MoviePage() {
                 <p className="mb-4 leading-relaxed">
                   {summary}
                 </p>
-                {movie.ai_reasons && movie.ai_reasons.length > 0 && (
-                  <div className="bg-black/20 p-4 rounded-lg border border-zinc-800 my-4">
-                    <h4 className="text-orange-400 mb-2 text-sm font-medium">Why this film perfectly matches your {moodString} mood:</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-sm text-zinc-400">
-                      {movie.ai_reasons.map((reason, index) => (
-                        <li key={index}>{reason}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
                 <p className="text-zinc-400 text-sm">
                   Experience the perfect harmony between this cinematic masterpiece and your chosen mood. Stream or watch this film to align 
                   with your selected mood. The director&apos;s artistic vision creates an immersive world that 
@@ -297,26 +305,32 @@ export default function MoviePage() {
                 </div>
                 
                 <p className="code-text text-base text-zinc-300 mb-4">
-                  <span className="text-orange-400">{capitalizedMood}:</span> This film exemplifies the essence of {moodString.toLowerCase()}, 
+                  <span className="text-orange-400">{displayMood}:</span> This film exemplifies the essence of {moodForPath}, 
                   bringing together visual storytelling and emotional depth that resonates perfectly 
                   with your selected mood. The director's artistic vision creates an immersive world that 
                   mirrors and enhances your current state of mind.
                 </p>
                 
-                {/* AI Reasoning */}
-                {movie.ai_reasons && movie.ai_reasons.length > 0 && (
-                  <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-                    <h4 className="code-text text-sm font-semibold text-orange-300 mb-2">Why This Film Matches Your Mood:</h4>
-                    <ul className="space-y-2">
+                {/* Always show the "Why This Film Matches Your Mood" section, with AI reasons if available */}
+                <div className="mb-4 p-4 bg-zinc-800/50 rounded-lg border border-orange-800/30">
+                  <h4 className="code-text text-sm font-semibold text-orange-400 mb-3">Why This Film Perfectly Matches Your {displayMood} Mood:</h4>
+                  {movie.ai_reasons && movie.ai_reasons.length > 0 ? (
+                    <ul className="space-y-3">
                       {movie.ai_reasons.map((reason, index) => (
                         <li key={index} className="code-text text-sm text-zinc-300 flex items-start">
-                          <span className="text-orange-400 mr-2">•</span>
+                          <span className="text-orange-400 mr-2 text-lg">•</span>
                           <span>{reason}</span>
                         </li>
                       ))}
                     </ul>
-                  </div>
-                )}
+                  ) : (
+                    <p className="code-text text-sm text-zinc-300">
+                      This {moodForPath} film captures the essence of the genre with its distinctive visual style, 
+                      compelling narrative, and emotional resonance. The director's approach perfectly embodies 
+                      what makes {moodForPath} films so engaging and impactful.
+                    </p>
+                  )}
+                </div>
                 
                 {movie.cast && movie.cast.length > 0 && (
                   <div className="mb-4">

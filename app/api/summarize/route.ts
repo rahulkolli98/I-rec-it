@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
+  const modelName = process.env.BOOK_SUMMARY_MODEL || 'mistralai/mistral-nemo';
 
   if (!apiKey) {
     return NextResponse.json({ error: 'Missing OPENROUTER_API_KEY environment variable' }, { status: 500 });
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'deepseek/deepseek-chat:free',
+        model: modelName,
         messages: [
           {
             role: 'user',

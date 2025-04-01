@@ -37,16 +37,20 @@ interface CastMember {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const mood = searchParams.get('mood');
+  let mood = searchParams.get('mood');
   const randomSeed = searchParams.get('seed') || Date.now().toString();
 
   if (!mood) {
     return NextResponse.json({ error: 'Missing mood parameter' }, { status: 400 });
   }
 
+  // Normalize the mood parameter to lowercase for processing
+  mood = mood.toLowerCase();
+
   const tmdbApiKey = process.env.TMDB_API_KEY;
   const tmdbAccessToken = process.env.TMDB_ACCESS_TOKEN;
   const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+  const modelName = process.env.MOVIE_RECOMMENDATION_MODEL || 'mistralai/mistral-nemo';
   
   if (!tmdbApiKey || !tmdbAccessToken) {
     return NextResponse.json({ error: 'Missing TMDB API credentials in environment variables' }, { status: 500 });
@@ -57,103 +61,124 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Enhanced mood descriptions for AI-based recommendations
+    // Enhanced mood/genre descriptions for AI-based recommendations
+    // Updated to match the moods shown in the UI buttons
     const moodDescriptions: Record<string, string> = {
-      happy: "joyful, uplifting, and light-hearted movies that leave viewers feeling good",
-      sad: "emotionally moving, melancholic films that may evoke tears or deep emotions",
-      excited: "thrilling, high-energy, and adrenaline-pumping films with intense action",
-      relaxed: "calm, peaceful films with beautiful scenery or gentle storytelling",
-      romantic: "heartfelt love stories with emotional relationships at their center",
-      scared: "frightening, tense horror or thriller films designed to create fear",
-      thoughtful: "philosophical, intellectually stimulating films that make viewers think",
-      mysterious: "enigmatic films with puzzles, secrets, or detective elements",
-      adventurous: "journey-filled movies with exploration, discovery, and action",
-      nostalgic: "films that evoke memories of the past or have a timeless quality",
-      inspired: "motivational stories often based on real achievements or overcoming obstacles",
-      tense: "suspenseful films that keep viewers on the edge of their seats",
-      funny: "comedies focused on humor and laughter with jokes and amusing situations",
-      epic: "grand, sweeping tales with large-scale stories, often in fantasy or historical settings",
-      heartwarming: "emotionally satisfying films with positive messages about humanity"
+      action: "high-energy films with dynamic action sequences, physical feats, and exciting confrontations that keep viewers engaged with thrilling conflicts.",
+      comedy: "humorous films designed to make viewers laugh through witty dialogue, funny situations, and comedic timing.",
+      drama: "emotionally resonant films that explore complex character relationships and human experiences, often with serious themes.",
+      horror: "frightening, tense films designed to scare viewers through suspense, supernatural elements, or threatening scenarios.",
+      adventure: "journey-filled movies with exploration, discovery, and action that transport viewers to exciting locations and situations.",
+      thriller: "suspenseful films that build anticipation and anxiety through conflict, time pressure, or high-stakes situations.",
+      romance: "heartfelt love stories with emotional depth, chemistry between characters, and meaningful relationships at their center.",
+      animation: "visually creative films using animation techniques to tell stories that may range from family-friendly to mature themes.",
+      fantasy: "imaginative films featuring magical elements, fictional worlds, supernatural beings, and fantastical adventures.",
+      scifi: "speculative fiction films exploring futuristic concepts, technology, space exploration, or alternate realities.",
+      historical: "films set in the past that recreate historical events, periods, or figures with varying degrees of accuracy.",
+      mystery: "enigmatic films with puzzles, secrets, or detective elements that engage viewers in solving a central question.",
+      musical: "films incorporating song and dance numbers as an essential storytelling element, expressing emotions through music.",
+      documentary: "non-fiction films presenting factual information about real events, people, or subjects with an educational purpose.",
+      crime: "films centered around criminal activities, investigations, or the justice system, often exploring moral complexities.",
+      western: "films set in the American Old West featuring cowboys, frontiers, and themes of law and lawlessness.",
+      superhero: "films featuring characters with extraordinary abilities who combat evil forces, often based on comic book characters.",
+      war: "films depicting armed conflicts, military operations, and the experiences of soldiers and civilians during wartime.",
+      foreign: "international films from non-English speaking countries, offering diverse cultural perspectives and storytelling styles.",
+      indie: "independently produced films often characterized by creative risk-taking, personal vision, and lower budgets than mainstream cinema."
     };
 
-    // Genre mapping for the AI to reference
-    const genreExamples: Record<string, string> = {
-      happy: "Comedy, Family, Animation, Musical",
-      sad: "Drama, Romance (with tragic elements), War",
-      excited: "Action, Adventure, Sci-Fi, Superhero",
-      relaxed: "Documentary, Nature, Gentle Comedy, Slice-of-Life",
-      romantic: "Romance, Romantic Comedy, Drama with love stories",
-      scared: "Horror, Supernatural, Psychological Thriller",
-      thoughtful: "Drama, Sci-Fi with philosophical themes, Arthouse",
-      mysterious: "Mystery, Thriller, Crime, Detective",
-      adventurous: "Adventure, Action, Fantasy, Expedition films",
-      nostalgic: "Period Dramas, Coming-of-Age, Classic films",
-      inspired: "Biographical, Sports, Underdog stories",
-      tense: "Thriller, Crime, Psychological Suspense",
-      funny: "Comedy, Slapstick, Satire, Rom-Com",
-      epic: "Fantasy, Historical Epic, War, Mythology-based",
-      heartwarming: "Family, Inspirational Drama, Feel-good films"
+    // Genre IDs mapping for TMDB
+    const genreMapping: Record<string, number[]> = {
+      action: [28],
+      comedy: [35],
+      drama: [18],
+      horror: [27],
+      adventure: [12],
+      thriller: [53],
+      romance: [10749],
+      animation: [16],
+      fantasy: [14],
+      scifi: [878],
+      historical: [36],
+      mystery: [9648],
+      musical: [10402],
+      documentary: [99],
+      crime: [80],
+      western: [37],
+      superhero: [28, 14], // Combine Action and Fantasy for Superhero
+      war: [10752],
+      foreign: [], // This is handled differently as it's a language parameter
+      indie: [] // This is harder to capture with genres alone
     };
 
-    // Examples of movies that exemplify each mood
-    const exampleMovies: Record<string, string> = {
-      happy: "The Lego Movie, Singin' in the Rain, Toy Story, School of Rock",
-      sad: "The Shawshank Redemption, Schindler's List, Life is Beautiful",
-      excited: "Mad Max: Fury Road, Die Hard, Mission Impossible series",
-      relaxed: "The Secret Life of Walter Mitty, Chef, Lost in Translation",
-      romantic: "The Notebook, Before Sunrise, When Harry Met Sally",
-      scared: "The Shining, Get Out, A Quiet Place, Hereditary",
-      thoughtful: "Inception, Arrival, The Matrix, Eternal Sunshine of the Spotless Mind",
-      mysterious: "Knives Out, Gone Girl, Memento, The Prestige",
-      adventurous: "Indiana Jones series, The Lord of the Rings, Pirates of the Caribbean",
-      nostalgic: "The Sandlot, Stand By Me, Back to the Future",
-      inspired: "The Pursuit of Happyness, Rocky, Hidden Figures",
-      tense: "No Country for Old Men, Sicario, Prisoners",
-      funny: "Superbad, Bridesmaids, The Hangover, Shaun of the Dead",
-      epic: "Gladiator, Braveheart, The Lord of the Rings",
-      heartwarming: "Forrest Gump, The Intouchables, CODA"
+    // Mood keywords that help describe each genre/mood
+    const moodKeywords: Record<string, string[]> = {
+      action: ['thrilling', 'intense', 'high-energy', 'adrenaline-pumping', 'dynamic'],
+      comedy: ['funny', 'humorous', 'witty', 'hilarious', 'amusing'],
+      drama: ['emotional', 'moving', 'powerful', 'thought-provoking', 'compelling'],
+      horror: ['scary', 'frightening', 'terrifying', 'chilling', 'unsettling'],
+      adventure: ['exciting', 'journey', 'exploration', 'quest', 'discovery'],
+      thriller: ['suspenseful', 'tense', 'gripping', 'nail-biting', 'riveting'],
+      romance: ['love', 'passionate', 'heartwarming', 'emotional', 'intimate'],
+      animation: ['colorful', 'imaginative', 'creative', 'vibrant', 'fantastical'],
+      fantasy: ['magical', 'enchanting', 'mythical', 'wondrous', 'imaginative'],
+      scifi: ['futuristic', 'technological', 'speculative', 'innovative', 'mind-bending'],
+      historical: ['period', 'era', 'authentic', 'traditional', 'classic'],
+      mystery: ['enigmatic', 'puzzling', 'suspenseful', 'intriguing', 'twisty'],
+      musical: ['melodic', 'rhythmic', 'harmonious', 'theatrical', 'choreographed'],
+      documentary: ['informative', 'educational', 'factual', 'revealing', 'insightful'],
+      crime: ['detective', 'investigative', 'gritty', 'underworld', 'heist'],
+      western: ['frontier', 'cowboy', 'rugged', 'wilderness', 'old west'],
+      superhero: ['heroic', 'powerful', 'extraordinary', 'courageous', 'epic'],
+      war: ['battlefield', 'combat', 'military', 'strategic', 'patriotic'],
+      foreign: ['international', 'cultural', 'subtitled', 'global', 'diverse'],
+      indie: ['unique', 'artistic', 'creative', 'personal', 'unconventional']
     };
 
-    // Prepare a prompt for OpenRouter to generate movie recommendations
-    const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
-    const moodDescription = moodDescriptions[mood.toLowerCase()] || `movies that would make someone feel ${mood}`;
-    const genreExample = genreExamples[mood.toLowerCase()] || "various genres";
-    const exampleMovieList = exampleMovies[mood.toLowerCase()] || "various movies";
-    
     // Use random seed to ensure variety in recommendations
     const seedInt = parseInt(randomSeed);
     const promptVariation = seedInt % 3; // Create 3 different prompt variations
     
     let promptVariationText = "";
     if (promptVariation === 0) {
-      promptVariationText = "Include some well-known classics as well as a few less obvious choices.";
+      promptVariationText = "Include a mix of well-known classics and hidden gems that perfectly embody this genre/mood.";
     } else if (promptVariation === 1) {
-      promptVariationText = "Include a mix of recent releases and timeless favorites.";
+      promptVariationText = "Focus on films that are critically acclaimed and have strong emotional resonance with audiences.";
     } else {
-      promptVariationText = "Include both mainstream and some critically-acclaimed but less known films.";
+      promptVariationText = "Include films from different decades that have stood the test of time in capturing this specific genre/mood.";
     }
 
-    // Create the prompt for OpenRouter
+    // Get the appropriate description for the requested mood
+    const moodDescription = moodDescriptions[mood] || `movies in the ${mood} genre/mood`;
+    
+    // Prepare the OpenRouter API URL
+    const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
+    
+    // Create the prompt for OpenRouter with focus on desired characteristics
     const prompt = `
-      As a film expert, suggest 5 specific movies that would be perfect for someone in a "${mood}" mood.
+      As a film expert, suggest 5 specific movies that would be perfect for someone in a "${mood.toUpperCase()}" mood or wanting to watch a "${mood.toUpperCase()}" genre film.
       
-      A "${mood}" mood typically calls for ${moodDescription}.
-      Genres that often work well for this mood include: ${genreExample}.
-      Examples of films that fit this mood well: ${exampleMovieList}.
+      ${mood.toUpperCase()} films are characterized by ${moodDescription}
       
       ${promptVariationText}
+      
+      When selecting films, prioritize:
+      - Strong representation of the ${mood} genre/mood with its typical elements and conventions
+      - Visual elements that reinforce the genre (colors, lighting, scenery, special effects)
+      - Memorable characters and performances that exemplify this type of film
+      - Soundtrack and audio elements that enhance the genre experience
+      - Pacing and storytelling techniques appropriate to ${mood} films
       
       For each movie, provide:
       1. Full title (exactly as it would appear in a database)
       2. Year of release
       3. Director (if notable)
-      4. 1-2 sentences on why it's perfect for a "${mood}" mood
+      4. 1-2 sentences on why it's a perfect ${mood} film, focusing on specific elements that make it exemplary of this genre/mood
       
       Format your response as a JSON array with properties: title, year, director, reasons (array of strings).
       Don't include any other text in your response except the valid JSON.
     `;
 
-    // Get movie recommendations from OpenRouter
+    // Get movie recommendations from OpenRouter using the model specified in environment variables
     const openRouterResponse = await fetch(openRouterUrl, {
       method: 'POST',
       headers: {
@@ -161,7 +186,7 @@ export async function GET(request: Request) {
         'Authorization': `Bearer ${openRouterApiKey}`,
       },
       body: JSON.stringify({
-        model: 'deepseek/deepseek-chat:free',
+        model: modelName,
         messages: [
           {
             role: 'user',
@@ -203,185 +228,163 @@ export async function GET(request: Request) {
       return fallbackToGenreMapping(tmdbApiKey, mood, seedInt);
     }
 
-    // Select one movie randomly from the suggestions
-    const selectedIndex = seedInt % movieSuggestions.length;
-    const selectedSuggestion = movieSuggestions[selectedIndex];
+    // Randomize the order of suggestions based on seed
+    movieSuggestions = shuffleArray(movieSuggestions, seedInt);
 
-    // Search for the movie on TMDB to get full details
-    let searchQuery = selectedSuggestion.title;
-    if (selectedSuggestion.year) {
-      searchQuery += ` ${selectedSuggestion.year}`;
-    }
-    
-    const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(searchQuery)}&include_adult=false`;
-    const searchResponse = await fetch(searchUrl);
-    const searchData = await searchResponse.json();
+    // Try each suggestion one by one until we find a match in TMDB
+    for (const suggestion of movieSuggestions) {
+      try {
+        // Search for the movie on TMDB
+        let searchQuery = suggestion.title;
+        if (suggestion.year) {
+          searchQuery += ` ${suggestion.year}`;
+        }
+        
+        const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(searchQuery)}&include_adult=false`;
+        const searchResponse = await fetch(searchUrl);
+        const searchData = await searchResponse.json();
 
-    if (!searchData.results || searchData.results.length === 0) {
-      // If no results, try searching without the year
-      const titleOnlyUrl = `https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(selectedSuggestion.title)}&include_adult=false`;
-      const titleOnlyResponse = await fetch(titleOnlyUrl);
-      const titleOnlyData = await titleOnlyResponse.json();
-      
-      if (!titleOnlyData.results || titleOnlyData.results.length === 0) {
-        console.error('No TMDB results for suggested movie:', selectedSuggestion.title);
-        return fallbackToGenreMapping(tmdbApiKey, mood, seedInt);
+        if (!searchData.results || searchData.results.length === 0) {
+          // If no results with year, try without the year
+          const titleOnlyUrl = `https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(suggestion.title)}&include_adult=false`;
+          const titleOnlyResponse = await fetch(titleOnlyUrl);
+          const titleOnlyData = await titleOnlyResponse.json();
+          
+          if (!titleOnlyData.results || titleOnlyData.results.length === 0) {
+            // No results for this suggestion, try the next one
+            console.log(`No TMDB results for ${suggestion.title}, trying next suggestion`);
+            continue;
+          }
+          
+          searchData.results = titleOnlyData.results;
+        }
+
+        // Get the most relevant result
+        const tmdbMovie = searchData.results[0];
+        
+        // Fetch detailed movie info including videos and credits
+        const movieDetailsUrl = `https://api.themoviedb.org/3/movie/${tmdbMovie.id}?api_key=${tmdbApiKey}&append_to_response=videos,credits`;
+        const detailsResponse = await fetch(movieDetailsUrl);
+        const movieDetails = await detailsResponse.json();
+        
+        // Find a trailer in the videos
+        let trailerKey = null;
+        if (movieDetails.videos && movieDetails.videos.results) {
+          const trailer = movieDetails.videos.results.find(
+            (video: VideoResult) => video.type === 'Trailer' && video.site === 'YouTube'
+          );
+          if (trailer) {
+            trailerKey = trailer.key;
+          }
+        }
+        
+        // Get keywords for this mood
+        const currentMoodKeywords = moodKeywords[mood] || [];
+        
+        // Format the movie data with AI-provided information plus TMDB details
+        const formattedMovie = {
+          id: movieDetails.id,
+          title: movieDetails.title,
+          overview: movieDetails.overview,
+          release_date: movieDetails.release_date,
+          vote_average: movieDetails.vote_average,
+          poster_path: movieDetails.poster_path,
+          backdrop_path: movieDetails.backdrop_path,
+          genres: movieDetails.genres || [],
+          trailer_key: trailerKey,
+          director: suggestion.director || 
+                    movieDetails.credits?.crew?.find((person: CrewMember) => person.job === 'Director')?.name || 
+                    'Unknown',
+          cast: movieDetails.credits?.cast?.slice(0, 5).map((person: CastMember) => person.name) || [],
+          mood_keywords: currentMoodKeywords,
+          ai_reasons: suggestion.reasons || []
+        };
+        
+        return NextResponse.json({ movie: formattedMovie });
+      } catch (error) {
+        console.error(`Error processing suggestion ${suggestion.title}:`, error);
+        // Continue to the next suggestion
       }
-      
-      searchData.results = titleOnlyData.results;
     }
 
-    // Get the most relevant result
-    const tmdbMovie = searchData.results[0];
+    // If all suggestions failed, fall back to genre mapping
+    console.log('All AI suggestions failed, falling back to genre mapping');
+    return fallbackToGenreMapping(tmdbApiKey, mood, seedInt);
     
-    // Fetch detailed movie info including videos
-    const movieDetailsUrl = `https://api.themoviedb.org/3/movie/${tmdbMovie.id}?api_key=${tmdbApiKey}&append_to_response=videos,credits`;
-    const detailsResponse = await fetch(movieDetailsUrl);
-    const movieDetails = await detailsResponse.json();
-    
-    // Find a trailer in the videos
-    let trailerKey = null;
-    if (movieDetails.videos && movieDetails.videos.results) {
-      const trailer = movieDetails.videos.results.find(
-        (video: VideoResult) => video.type === 'Trailer' && video.site === 'YouTube'
-      );
-      if (trailer) {
-        trailerKey = trailer.key;
-      }
-    }
-    
-    // Add mood-relevant keywords from the AI's reasons
-    let moodKeywords: string[] = [];
-    if (selectedSuggestion.reasons && selectedSuggestion.reasons.length > 0) {
-      // Add the most commonly used descriptor words for this mood
-      const commonMoodKeywords: Record<string, string[]> = {
-        happy: ['uplifting', 'cheerful', 'joyful', 'funny', 'light-hearted'],
-        sad: ['emotional', 'moving', 'tragic', 'somber', 'poignant'],
-        excited: ['thrilling', 'high-energy', 'adrenaline-pumping', 'intense', 'action-packed'],
-        relaxed: ['calm', 'peaceful', 'laid-back', 'soothing', 'gentle'],
-        romantic: ['love', 'passionate', 'heartwarming', 'emotional', 'intimate'],
-        scared: ['frightening', 'terrifying', 'chilling', 'creepy', 'unsettling'],
-        thoughtful: ['profound', 'philosophical', 'thought-provoking', 'deep', 'intelligent'],
-        mysterious: ['enigmatic', 'puzzling', 'suspenseful', 'intriguing', 'twisty'],
-        adventurous: ['epic', 'journey', 'exploration', 'quest', 'discovery'],
-        nostalgic: ['classic', 'reminiscent', 'memorable', 'timeless', 'retro'],
-        inspired: ['motivational', 'encouraging', 'true story', 'uplifting', 'triumphant'],
-        tense: ['suspenseful', 'edge-of-seat', 'gripping', 'nail-biting', 'riveting'],
-        funny: ['hilarious', 'laugh-out-loud', 'comedic', 'witty', 'amusing'],
-        epic: ['grand', 'sweeping', 'monumental', 'majestic', 'vast'],
-        heartwarming: ['touching', 'feel-good', 'emotional', 'uplifting', 'sweet']
-      };
-      
-      moodKeywords = commonMoodKeywords[mood.toLowerCase()] || [];
-    }
-    
-    // Format the movie data with AI-provided information plus TMDB details
-    const formattedMovie = {
-      id: movieDetails.id,
-      title: movieDetails.title,
-      overview: movieDetails.overview,
-      release_date: movieDetails.release_date,
-      vote_average: movieDetails.vote_average,
-      poster_path: movieDetails.poster_path,
-      backdrop_path: movieDetails.backdrop_path,
-      genres: movieDetails.genres || [],
-      trailer_key: trailerKey,
-      director: selectedSuggestion.director || 
-                movieDetails.credits?.crew?.find((person: CrewMember) => person.job === 'Director')?.name || 
-                'Unknown',
-      cast: movieDetails.credits?.cast?.slice(0, 5).map((person: CastMember) => person.name) || [],
-      mood_keywords: moodKeywords,
-      ai_reasons: selectedSuggestion.reasons || []
-    };
-    
-    return NextResponse.json({ movie: formattedMovie });
   } catch (error) {
     console.error('Error in AI movie recommendation:', error);
     return fallbackToGenreMapping(tmdbApiKey, mood, parseInt(randomSeed));
   }
 }
 
-// Fallback function to use the original genre-mapping method if AI recommendation fails
+// Helper function to shuffle array based on a seed
+function shuffleArray<T>(array: T[], seed: number): T[] {
+  const newArray = [...array];
+  let currentIndex = newArray.length;
+  let seedValue = seed;
+
+  // Fisher-Yates shuffle with seed
+  while (currentIndex > 0) {
+    seedValue = (seedValue * 9301 + 49297) % 233280;
+    const randomIndex = Math.floor((seedValue / 233280) * currentIndex);
+    currentIndex--;
+    
+    // Swap elements
+    [newArray[currentIndex], newArray[randomIndex]] = [newArray[randomIndex], newArray[currentIndex]];
+  }
+
+  return newArray;
+}
+
+// Fallback function to use TMDB genre IDs if AI recommendation fails
 async function fallbackToGenreMapping(apiKey: string, mood: string, seedNum: number): Promise<NextResponse> {
   try {
     console.log('Falling back to genre mapping for movie recommendation');
     
-    // Enhanced mood to genre mapping - primary and secondary genres for better matching
-    const moodGenreMapping: Record<string, { primary: number[], secondary: number[] }> = {
-      happy: { 
-        primary: [35], // Comedy as primary
-        secondary: [10751, 16, 12] // Family, Animation, Adventure as secondary
-      },
-      sad: { 
-        primary: [18], // Drama as primary
-        secondary: [10749] // Romance as secondary (often has sad elements)
-      },
-      excited: { 
-        primary: [28], // Action as primary
-        secondary: [12, 878] // Adventure, Sci-Fi as secondary
-      },
-      relaxed: { 
-        primary: [12], // Adventure as primary
-        secondary: [16, 10751, 14] // Animation, Family, Fantasy as secondary
-      },
-      romantic: { 
-        primary: [10749], // Romance as primary
-        secondary: [18, 35] // Drama, Comedy as secondary
-      },
-      scared: { 
-        primary: [27], // Horror as primary
-        secondary: [53, 9648] // Thriller, Mystery as secondary
-      },
-      thoughtful: { 
-        primary: [878, 18], // Sci-Fi, Drama as primary
-        secondary: [9648, 99] // Mystery, Documentary as secondary
-      },
-      mysterious: { 
-        primary: [9648], // Mystery as primary
-        secondary: [53, 80] // Thriller, Crime as secondary
-      },
-      adventurous: { 
-        primary: [12], // Adventure as primary
-        secondary: [28, 14, 16] // Action, Fantasy, Animation as secondary
-      },
-      nostalgic: { 
-        primary: [36], // History as primary
-        secondary: [18, 10751] // Drama, Family as secondary
-      },
-      inspired: { 
-        primary: [99, 18], // Documentary, Drama as primary
-        secondary: [36, 10752] // History, War as secondary (often inspirational)
-      },
-      tense: { 
-        primary: [53], // Thriller as primary
-        secondary: [80, 27, 9648] // Crime, Horror, Mystery as secondary
-      },
-      funny: { 
-        primary: [35], // Comedy as primary
-        secondary: [10751, 12] // Family, Adventure as secondary
-      },
-      epic: { 
-        primary: [14, 12], // Fantasy, Adventure as primary
-        secondary: [28, 10752] // Action, War as secondary
-      },
-      heartwarming: { 
-        primary: [10751, 18], // Family, Drama as primary
-        secondary: [35, 10749] // Comedy, Romance as secondary
-      }
+    // Updated genre mappings to match UI moods exactly
+    const genreMapping: Record<string, number[]> = {
+      action: [28],
+      comedy: [35],
+      drama: [18],
+      horror: [27],
+      adventure: [12],
+      thriller: [53],
+      romance: [10749],
+      animation: [16],
+      fantasy: [14],
+      scifi: [878], // Science Fiction
+      historical: [36], // History
+      mystery: [9648],
+      musical: [10402],
+      documentary: [99],
+      crime: [80],
+      western: [37],
+      superhero: [28, 878], // Action + Sci-Fi (closest to superhero)
+      war: [10752],
+      foreign: [], // Special case handled below
+      indie: [] // Special case handled below
     };
     
-    // Default to drama+comedy if no mapping exists
-    const targetMood = moodGenreMapping[mood.toLowerCase()] || { 
-      primary: [18, 35], 
-      secondary: [12, 10751] 
-    };
+    let url;
+    const genreIds = genreMapping[mood] || [];
     
     // Get a consistent but random page (1-5) based on the seed
     const randomPage = (seedNum % 5) + 1;
     
-    // Fetch movies from TMDB with primary genres
-    const primaryGenreString = targetMood.primary.join('|');
-    const url = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_genres=${primaryGenreString}&page=${randomPage}&sort_by=popularity.desc&vote_count.gte=100`;
+    if (mood === 'foreign') {
+      // For foreign films, we'll search for non-English language films
+      url = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&language=en-US&with_original_language=fr|es|ja|ko|de|it|zh&page=${randomPage}&sort_by=popularity.desc&vote_count.gte=100`;
+    } else if (mood === 'indie') {
+      // For indie films, we'll use a lower budget filter
+      url = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&language=en-US&page=${randomPage}&sort_by=popularity.desc&vote_count.gte=50&vote_average.gte=6&with_companies=43|5491|2|7|25`;
+    } else if (genreIds.length > 0) {
+      // Normal genre filtering
+      const genreString = genreIds.join('|');
+      url = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_genres=${genreString}&page=${randomPage}&sort_by=popularity.desc&vote_count.gte=100`;
+    } else {
+      // Fallback for unknown moods
+      url = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&page=${randomPage}&sort_by=popularity.desc&vote_count.gte=100`;
+    }
     
     const response = await fetch(url);
     const data = await response.json();
@@ -410,23 +413,28 @@ async function fallbackToGenreMapping(apiKey: string, mood: string, seedNum: num
       }
     }
     
-    // Basic mood keywords
+    // Updated mood keywords to match UI moods
     const moodKeywords: Record<string, string[]> = {
-      happy: ['uplifting', 'cheerful', 'joyful'],
-      sad: ['emotional', 'moving', 'tragic'],
-      excited: ['thrilling', 'high-energy', 'adrenaline-pumping'],
-      relaxed: ['calm', 'peaceful', 'laid-back'],
-      romantic: ['love', 'passionate', 'heartwarming'],
-      scared: ['frightening', 'terrifying', 'chilling'],
-      thoughtful: ['profound', 'philosophical', 'thought-provoking'],
-      mysterious: ['enigmatic', 'puzzling', 'suspenseful'],
-      adventurous: ['epic', 'journey', 'exploration'],
-      nostalgic: ['classic', 'reminiscent', 'memorable'],
-      inspired: ['motivational', 'encouraging', 'true story'],
-      tense: ['suspenseful', 'edge-of-seat', 'gripping'],
-      funny: ['hilarious', 'laugh-out-loud', 'comedic'],
-      epic: ['grand', 'sweeping', 'monumental'],
-      heartwarming: ['touching', 'feel-good', 'emotional']
+      action: ['thrilling', 'intense', 'high-energy', 'adrenaline-pumping', 'dynamic'],
+      comedy: ['funny', 'humorous', 'witty', 'hilarious', 'amusing'],
+      drama: ['emotional', 'moving', 'powerful', 'thought-provoking', 'compelling'],
+      horror: ['scary', 'frightening', 'terrifying', 'chilling', 'unsettling'],
+      adventure: ['exciting', 'journey', 'exploration', 'quest', 'discovery'],
+      thriller: ['suspenseful', 'tense', 'gripping', 'nail-biting', 'riveting'],
+      romance: ['love', 'passionate', 'heartwarming', 'emotional', 'intimate'],
+      animation: ['colorful', 'imaginative', 'creative', 'vibrant', 'fantastical'],
+      fantasy: ['magical', 'enchanting', 'mythical', 'wondrous', 'imaginative'],
+      scifi: ['futuristic', 'technological', 'speculative', 'innovative', 'mind-bending'],
+      historical: ['period', 'era', 'authentic', 'traditional', 'classic'],
+      mystery: ['enigmatic', 'puzzling', 'suspenseful', 'intriguing', 'twisty'],
+      musical: ['melodic', 'rhythmic', 'harmonious', 'theatrical', 'choreographed'],
+      documentary: ['informative', 'educational', 'factual', 'revealing', 'insightful'],
+      crime: ['detective', 'investigative', 'gritty', 'underworld', 'heist'],
+      western: ['frontier', 'cowboy', 'rugged', 'wilderness', 'old west'],
+      superhero: ['heroic', 'powerful', 'extraordinary', 'courageous', 'epic'],
+      war: ['battlefield', 'combat', 'military', 'strategic', 'patriotic'],
+      foreign: ['international', 'cultural', 'subtitled', 'global', 'diverse'],
+      indie: ['unique', 'artistic', 'creative', 'personal', 'unconventional']
     };
     
     // Format the movie data
@@ -442,7 +450,7 @@ async function fallbackToGenreMapping(apiKey: string, mood: string, seedNum: num
       trailer_key: trailerKey,
       director: movieDetails.credits?.crew?.find((person: CrewMember) => person.job === 'Director')?.name || 'Unknown',
       cast: movieDetails.credits?.cast?.slice(0, 5).map((person: CastMember) => person.name) || [],
-      mood_keywords: moodKeywords[mood.toLowerCase()] || []
+      mood_keywords: moodKeywords[mood] || []
     };
     
     return NextResponse.json({ movie: formattedMovie });

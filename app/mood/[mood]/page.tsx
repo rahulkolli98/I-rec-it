@@ -8,6 +8,7 @@ import DynamicBackground from '@/app/components/DynamicBackground';
 import NoiseOverlay from '@/app/components/NoiseOverlay';
 import LoadingPage from '@/app/components/LoadingPage';
 import Head from 'next/head';
+import Image from 'next/image';
 import { useMedia } from '@/app/context/MediaContext';
 
 interface Book {
@@ -201,11 +202,22 @@ export default function MoodPage() {
                 }}
               >
                 <div className="gradient-border flex flex-col overflow-hidden rounded-lg shadow-xl">
-                  <img
-                    src={book.imageLinks?.thumbnail}
-                    alt={book.title}
-                    className="w-full h-[300px] object-contain bg-zinc-900/90 p-2"
-                  />
+                  {book.imageLinks?.thumbnail ? (
+                    <div className="relative w-full h-[300px] bg-zinc-900/90">
+                      <Image
+                        src={book.imageLinks.thumbnail}
+                        alt={book.title}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 280px"
+                        className="object-contain p-2"
+                        unoptimized={book.imageLinks.thumbnail.includes('ssl-images-amazon.com')}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-[300px] flex items-center justify-center bg-zinc-900/90 p-2">
+                      <span className="text-zinc-600">No image available</span>
+                    </div>
+                  )}
                   <div className="p-4">
                     <h2 className="modern-heading text-xl font-medium gradient-text mb-2">{book.title}</h2>
                     <p className="code-text text-sm text-zinc-400">{book.authors?.join(', ')}</p>

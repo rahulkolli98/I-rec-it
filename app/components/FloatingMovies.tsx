@@ -5,18 +5,20 @@ import { motion } from 'framer-motion';
 import styled from 'styled-components';
 import Image from 'next/image';
 
-// Curated selection of high-quality movie posters
+// Local movie posters from assets/moviepics
 const moviePosters = [
-  'https://image.tmdb.org/t/p/w500/6oom5QYQ2yQTMJIbnvbkBL9cHo6.jpg', // LOTR
-  'https://image.tmdb.org/t/p/w500/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg', // Inception
-  'https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg', // Shawshank Redemption
-  'https://image.tmdb.org/t/p/w500/tpoVEYvm6qcXueZrQYJNRLXL88s.jpg', // Edge of Tomorrow
-  'https://image.tmdb.org/t/p/w500/iiZZdoQBEYBv6id8su7ImL0oCbD.jpg', // Spider-Verse
-  'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg', // Interstellar
-  'https://image.tmdb.org/t/p/w500/4GFkMTIGHhMn9uQ3wJA5RrKoHZG.jpg', // Hereditary
-  'https://image.tmdb.org/t/p/w500/ek8e8txUyUwd2BNqevNlw8wkmuz.jpg', // Superbad
-  'https://image.tmdb.org/t/p/w500/rNzQyW4f8B8cQeg7Dgj3n6eT5k9.jpg', // The Notebook
-  'https://image.tmdb.org/t/p/w500/ceG9VzoRAVGwivFU403Wc3AHRys.jpg', // Raiders of the Lost Ark
+  '/assets/moviepics/OIP.jpg',
+  '/assets/moviepics/OIP (1).jpg',
+  '/assets/moviepics/OIP (2).jpg', 
+  '/assets/moviepics/OIP (3).jpg',
+  '/assets/moviepics/OIP (4).jpg',
+  '/assets/moviepics/OIP (5).jpg',
+  '/assets/moviepics/OIP (6).jpg',
+  '/assets/moviepics/OIP (7).jpg',
+  '/assets/moviepics/OIP (8).jpg',
+  '/assets/moviepics/download.jpg',
+  '/assets/moviepics/download (1).jpg',
+  '/assets/moviepics/download (2).jpg',
 ];
 
 interface FloatingMoviesProps {
@@ -157,7 +159,7 @@ const FloatingMovie: React.FC<FloatingMovieProps> = ({ src }) => {
         width: `${7 + depth * 5}%`, // Size based on depth
         maxWidth: '180px',
         zIndex: Math.floor(depth * 10),
-        opacity: 0.1 + depth * 0.7, // Opacity based on depth
+        opacity: 0.05 + depth * 0.3, // Reduced opacity based on depth
         filter: `blur(${depth > 0.8 ? 0 : 3 - depth * 4}px)`,
       }}
       initial={{
