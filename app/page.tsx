@@ -50,7 +50,7 @@ export default function Home() {
       <Navbar />
 
       <motion.div
-        className="relative z-10 text-white min-h-screen flex flex-col items-center justify-center p-4 md:p-8"
+        className="relative z-20 text-white min-h-screen flex flex-col items-center justify-center p-4 md:p-8 pt-24 md:pt-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
