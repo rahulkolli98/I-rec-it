@@ -49,15 +49,14 @@ export async function GET(request: Request) {
 
   const tmdbApiKey = process.env.TMDB_API_KEY;
   const tmdbAccessToken = process.env.TMDB_ACCESS_TOKEN;
-  const openRouterApiKey = process.env.OPENROUTER_API_KEY;
-  const modelName = process.env.MOVIE_RECOMMENDATION_MODEL || 'mistralai/mistral-nemo';
+  const geminiApiKey = process.env.GEMINI_API_KEY;
   
   if (!tmdbApiKey || !tmdbAccessToken) {
     return NextResponse.json({ error: 'Missing TMDB API credentials in environment variables' }, { status: 500 });
   }
 
-  if (!openRouterApiKey) {
-    return NextResponse.json({ error: 'Missing OPENROUTER_API_KEY environment variable' }, { status: 500 });
+  if (!geminiApiKey) {
+    return NextResponse.json({ error: 'Missing GEMINI_API_KEY environment variable' }, { status: 500 });
   }
 
   try {
@@ -150,10 +149,10 @@ export async function GET(request: Request) {
     // Get the appropriate description for the requested mood
     const moodDescription = moodDescriptions[mood] || `movies in the ${mood} genre/mood`;
     
-    // Prepare the OpenRouter API URL
-    const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
+    // Prepare the Gemini API URL
+    const geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
     
-    // Create the prompt for OpenRouter with focus on desired characteristics
+    // Create the prompt for Gemini with focus on desired characteristics
     const prompt = `
       As a film expert, suggest 5 specific movies that would be perfect for someone in a "${mood.toUpperCase()}" mood or wanting to watch a "${mood.toUpperCase()}" genre film.
       
@@ -178,32 +177,29 @@ export async function GET(request: Request) {
       Don't include any other text in your response except the valid JSON.
     `;
 
-    // Get movie recommendations from OpenRouter using the model specified in environment variables
-    const openRouterResponse = await fetch(openRouterUrl, {
+    // Get movie recommendations from Gemini
+    const geminiResponse = await fetch(`${geminiUrl}?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openRouterApiKey}`,
       },
       body: JSON.stringify({
-        model: modelName,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }]
       }),
     });
 
-    const openRouterData = await openRouterResponse.json();
+    const geminiData = await geminiResponse.json();
     
-    if (openRouterData.error) {
-      console.error('OpenRouter API Error:', openRouterData.error);
+    if (geminiData.error) {
+      console.error('Gemini API Error:', geminiData.error);
       return fallbackToGenreMapping(tmdbApiKey, mood, seedInt);
     }
 
-    const aiResponse = openRouterData.choices[0].message.content;
+    const aiResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
     // Extract the JSON from the AI response
     let movieSuggestions: MovieSuggestion[] = [];

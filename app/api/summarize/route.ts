@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
-  const modelName = process.env.BOOK_SUMMARY_MODEL || 'mistralai/mistral-nemo';
-
+  const apiKey = process.env.GEMINI_API_KEY;
+  const geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+  
   if (!apiKey) {
-    return NextResponse.json({ error: 'Missing OPENROUTER_API_KEY environment variable' }, { status: 500 });
+    return NextResponse.json({ error: 'Missing GEMINI_API_KEY environment variable' }, { status: 500 });
   }
 
   try {
@@ -16,31 +15,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing description parameter' }, { status: 400 });
     }
 
-    const response = await fetch(openRouterUrl, {
+    const response = await fetch(`${geminiUrl}?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: modelName,
-        messages: [
-          {
-            role: 'user',
-            content: `Summarize the following book description in a concise way:\n${description}`,
-          },
-        ],
+        contents: [{
+          parts: [{
+            text: `Summarize the following book description in a concise way:\n${description}`
+          }]
+        }]
       }),
     });
 
     const data = await response.json();
 
     if (data.error) {
-      console.error('OpenRouter API Error:', data.error);
+      console.error('Gemini API Error:', data.error);
       return NextResponse.json({ error: 'Failed to summarize description', details: data.error }, { status: 500 });
     }
 
-    const summary = data.choices[0].message.content;
+    const summary = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Failed to generate summary.';
     return NextResponse.json({ summary });
   } catch (error) {
     console.error('Error:', error);

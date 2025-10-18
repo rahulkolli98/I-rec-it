@@ -49,56 +49,52 @@ export default function MoodPage() {
     async function fetchBook() {
       setLoading(true);
       try {
-        // Fetch book title from OpenRouter API based on the selected mood
-        const openRouterApiKey = process.env.OPENROUTER_API_KEY;
-        const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
+        // Fetch book title from Gemini API based on the selected mood
+        const geminiApiKey = process.env.GEMINI_API_KEY;
+        const geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
         
-        // Use model from environment variables or fallback to a default
-        const recommendationModel = process.env.BOOK_RECOMMENDATION_MODEL || 'google/gemma-3-27b-it';
-        
-        if (!openRouterApiKey) {
-          throw new Error('Missing OPENROUTER_API_KEY in environment variables');
+        if (!geminiApiKey) {
+          throw new Error('Missing GEMINI_API_KEY in environment variables');
         }
         
-        const openRouterResponse = await fetch(openRouterUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openRouterApiKey}`,
-          },
-          body: JSON.stringify({
-            model: recommendationModel,
-            messages: [
-              {
-                role: 'user',
-                content: `As a literary expert, recommend a unique book title that perfectly captures the mood: ${mood}. 
+        const prompt = `As a literary expert, recommend a unique book title that perfectly captures the mood: ${mood}. 
 This is recommendation attempt #${regenerationCounter + 1}, so I need something different than previous suggestions.
 
 ${previousRecommendations.length > 0 ? `Please DO NOT recommend any of these books that were already suggested: ${previousRecommendations.join(', ')}` : ''}
 
 The book should be well-known enough to be found in public book databases.
-Return ONLY the exact book title without any additional text, quotes, or commentary.`,
-              },
-            ],
-            temperature: 0.9,
-            top_p: 0.9,
-            frequency_penalty: 0.8,
-            presence_penalty: 0.8,
+Return ONLY the exact book title without any additional text, quotes, or commentary.`;
+        
+        const geminiResponse = await fetch(`${geminiUrl}?key=${geminiApiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: prompt
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.9,
+              topP: 0.9,
+            }
           }),
         });
         
-        if (!openRouterResponse.ok) {
-          throw new Error(`OpenRouter API responded with status: ${openRouterResponse.status}`);
+        if (!geminiResponse.ok) {
+          throw new Error(`Gemini API responded with status: ${geminiResponse.status}`);
         }
         
-        const openRouterData = await openRouterResponse.json();
+        const geminiData = await geminiResponse.json();
         
-        if (!openRouterData || !openRouterData.choices || !openRouterData.choices[0] || !openRouterData.choices[0].message) {
-          console.error('Unexpected OpenRouter API response structure:', openRouterData);
-          throw new Error('Invalid response from OpenRouter API');
+        if (!geminiData || !geminiData.candidates || !geminiData.candidates[0] || !geminiData.candidates[0].content) {
+          console.error('Unexpected Gemini API response structure:', geminiData);
+          throw new Error('Invalid response from Gemini API');
         }
         
-        const bookTitle = openRouterData.choices[0].message.content.trim();
+        const bookTitle = geminiData.candidates[0].content.parts[0].text.trim();
         console.log('Recommended book title:', bookTitle);
 
         // Ensure we're not recommending the same book again

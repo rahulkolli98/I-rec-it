@@ -2,11 +2,10 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   // Check if API key is available
-  const openRouterApiKey = process.env.OPENROUTER_API_KEY;
-  const modelName = process.env.MOVIE_SUMMARY_MODEL || 'mistralai/mistral-nemo';
+  const geminiApiKey = process.env.GEMINI_API_KEY;
   
-  if (!openRouterApiKey) {
-    return NextResponse.json({ error: 'Missing OPENROUTER_API_KEY environment variable' }, { status: 500 });
+  if (!geminiApiKey) {
+    return NextResponse.json({ error: 'Missing GEMINI_API_KEY environment variable' }, { status: 500 });
   }
 
   // Extract data from request
@@ -70,8 +69,8 @@ export async function POST(request: Request) {
     // Get the appropriate description for the requested mood
     const moodDescription = moodDescriptions[normalizedMood] || `movies that would make someone feel ${normalizedMood}`;
     
-    // Create the prompt for OpenRouter to generate a movie summary
-    const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
+    // Create the prompt for Gemini to generate a movie summary
+    const geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
     const prompt = `
       You are tasked with creating a brief, engaging summary for the film "${data.title}" that highlights its connection to a ${normalizedMood.toUpperCase()} mood/genre.
       
@@ -94,32 +93,29 @@ export async function POST(request: Request) {
       Keep your response short, direct, and conversational in tone.
     `;
     
-    // Call OpenRouter API to generate the summary
-    const response = await fetch(openRouterUrl, {
+    // Call Gemini API to generate the summary
+    const response = await fetch(`${geminiUrl}?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openRouterApiKey}`,
       },
       body: JSON.stringify({
-        model: modelName,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }]
       }),
     });
     
     const responseData = await response.json();
     
     if (responseData.error) {
-      console.error('OpenRouter API Error:', responseData.error);
+      console.error('Gemini API Error:', responseData.error);
       return NextResponse.json({ error: 'Failed to summarize movie' }, { status: 500 });
     }
     
-    const summary = responseData.choices[0].message.content;
+    const summary = responseData.candidates?.[0]?.content?.parts?.[0]?.text || 'Failed to generate summary.';
     
     return NextResponse.json({ summary });
   } catch (error) {
